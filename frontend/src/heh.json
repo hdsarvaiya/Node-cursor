@@ -1,0 +1,357 @@
+{
+    "_id": {
+      "$oid": "675b055b303732e7190ce482"
+    },
+    "parentNode": "L&T",
+    "buildings": [
+      {
+        "name": "Block 1",
+        "routers": [
+          {
+            "routerName": "Router 1",
+            "routerId": "R-1",
+            "routerIp": "192.168.1.1",
+            "port": "eth0",
+            "switches": [
+              {
+                "switchName": "Switch 1",
+                "switchId": "S-1",
+                "switchIp": "192.168.1.2",
+                "port": "eth1",
+                "endDevices": [
+                  {
+                    "deviceName": "Device 1",
+                    "deviceType": "Printer",
+                    "deviceId": "D-1",
+                    "deviceIp": "192.168.1.101",
+                    "port": "p1"
+                  },
+                  {
+                    "deviceName": "Device 2",
+                    "deviceType": "Computer",
+                    "deviceId": "D-2",
+                    "deviceIp": "192.168.1.102",
+                    "port": "p2"
+                  },
+                  {
+                    "deviceName": "Device 3",
+                    "deviceType": "Camera",
+                    "deviceId": "D-3",
+                    "deviceIp": "192.168.1.103",
+                    "port": "p3"
+                  },
+                  {
+                    "deviceName": "Device 4",
+                    "deviceType": "Laptop",
+                    "deviceId": "D-4",
+                    "deviceIp": "192.168.1.104",
+                    "port": "p4"
+                  }
+                ]
+              },
+              {
+                "switchName": "Switch 2",
+                "switchId": "S-2",
+                "switchIp": "192.168.1.3",
+                "port": "eth2",
+                "endDevices": [
+                  {
+                    "deviceName": "Device 5",
+                    "deviceType": "Smartphone",
+                    "deviceId": "D-5",
+                    "deviceIp": "192.168.1.105",
+                    "port": "p5"
+                  },
+                  {
+                    "deviceName": "Device 6",
+                    "deviceType": "Server",
+                    "deviceId": "D-6",
+                    "deviceIp": "192.168.1.106",
+                    "port": "p6"
+                  },
+                  {
+                    "deviceName": "Device 7",
+                    "deviceType": "Printer",
+                    "deviceId": "D-7",
+                    "deviceIp": "192.168.1.107",
+                    "port": "p7"
+                  },
+                  {
+                    "deviceName": "Device 8",
+                    "deviceType": "Computer",
+                    "deviceId": "D-8",
+                    "deviceIp": "192.168.1.108",
+                    "port": "p8"
+                  }
+                ]
+              },
+              {
+                "switchName": "Switch 3",
+                "switchId": "S-3",
+                "switchIp": "192.168.1.4",
+                "port": "eth3",
+                "endDevices": [
+                  {
+                    "deviceName": "Device 9",
+                    "deviceType": "Camera",
+                    "deviceId": "D-9",
+                    "deviceIp": "192.168.1.109",
+                    "port": "p9"
+                  },
+                  {
+                    "deviceName": "Device 10",
+                    "deviceType": "Laptop",
+                    "deviceId": "D-10",
+                    "deviceIp": "192.168.1.110",
+                    "port": "p10"
+                  },
+                  {
+                    "deviceName": "Device 11",
+                    "deviceType": "Smartphone",
+                    "deviceId": "D-11",
+                    "deviceIp": "192.168.1.111",
+                    "port": "p11"
+                  },
+                  {
+                    "deviceName": "Device 12",
+                    "deviceType": "Server",
+                    "deviceId": "D-12",
+                    "deviceIp": "192.168.1.112",
+                    "port": "p12"
+                  }
+                ]
+              },
+              {
+                "switchName": "Switch 4",
+                "switchId": "S-4",
+                "switchIp": "192.168.1.5",
+                "port": "eth4",
+                "endDevices": [
+                  {
+                    "deviceName": "Device 13",
+                    "deviceType": "Printer",
+                    "deviceId": "D-13",
+                    "deviceIp": "192.168.1.113",
+                    "port": "p13"
+                  },
+                  {
+                    "deviceName": "Device 14",
+                    "deviceType": "Computer",
+                    "deviceId": "D-14",
+                    "deviceIp": "192.168.1.114",
+                    "port": "p14"
+                  },
+                  {
+                    "deviceName": "Device 15",
+                    "deviceType": "Camera",
+                    "deviceId": "D-15",
+                    "deviceIp": "192.168.1.115",
+                    "port": "p15"
+                  },
+                  {
+                    "deviceName": "Device 16",
+                    "deviceType": "Laptop",
+                    "deviceId": "D-16",
+                    "deviceIp": "192.168.1.116",
+                    "port": "p16"
+                  }
+                ]
+              },
+              {
+                "switchName": "Switch 5",
+                "switchId": "S-5",
+                "switchIp": "192.168.1.6",
+                "port": "eth5",
+                "endDevices": [
+                  {
+                    "deviceName": "Device 17",
+                    "deviceType": "Smartphone",
+                    "deviceId": "D-17",
+                    "deviceIp": "192.168.1.117",
+                    "port": "p17"
+                  },
+                  {
+                    "deviceName": "Device 18",
+                    "deviceType": "Server",
+                    "deviceId": "D-18",
+                    "deviceIp": "192.168.1.118",
+                    "port": "p18"
+                  },
+                  {
+                    "deviceName": "Device 19",
+                    "deviceType": "Printer",
+                    "deviceId": "D-19",
+                    "deviceIp": "192.168.1.119",
+                    "port": "p19"
+                  },
+                  {
+                    "deviceName": "Device 20",
+                    "deviceType": "Computer",
+                    "deviceId": "D-20",
+                    "deviceIp": "192.168.1.120",
+                    "port": "p20"
+                  }
+                ]
+              },
+              {
+                "switchName": "Switch 6",
+                "switchId": "S-6",
+                "switchIp": "192.168.1.7",
+                "port": "eth6",
+                "endDevices": [
+                  {
+                    "deviceName": "Device 21",
+                    "deviceType": "Camera",
+                    "deviceId": "D-21",
+                    "deviceIp": "192.168.1.121",
+                    "port": "p21"
+                  },
+                  {
+                    "deviceName": "Device 22",
+                    "deviceType": "Laptop",
+                    "deviceId": "D-22",
+                    "deviceIp": "192.168.1.122",
+                    "port": "p22"
+                  },
+                  {
+                    "deviceName": "Device 23",
+                    "deviceType": "Smartphone",
+                    "deviceId": "D-23",
+                    "deviceIp": "192.168.1.123",
+                    "port": "p23"
+                  },
+                  {
+                    "deviceName": "Device 24",
+                    "deviceType": "Server",
+                    "deviceId": "D-24",
+                    "deviceIp": "192.168.1.124",
+                    "port": "p24"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "routerName": "Router 2",
+            "routerId": "R-2",
+            "routerIp": "192.168.2.1",
+            "port": "eth0",
+            "switches": [
+              {
+                "switchName": "Switch 4",
+                "switchId": "S-4",
+                "switchIp": "192.168.2.2",
+                "port": "eth1",
+                "endDevices": [
+                  {
+                    "deviceName": "Device 13",
+                    "deviceType": "Printer",
+                    "deviceId": "D-13",
+                    "deviceIp": "192.168.2.101",
+                    "port": "p13"
+                  },
+                  {
+                    "deviceName": "Device 14",
+                    "deviceType": "Computer",
+                    "deviceId": "D-14",
+                    "deviceIp": "192.168.2.102",
+                    "port": "p14"
+                  },
+                  {
+                    "deviceName": "Device 15",
+                    "deviceType": "Camera",
+                    "deviceId": "D-15",
+                    "deviceIp": "192.168.2.103",
+                    "port": "p15"
+                  },
+                  {
+                    "deviceName": "Device 16",
+                    "deviceType": "Laptop",
+                    "deviceId": "D-16",
+                    "deviceIp": "192.168.2.104",
+                    "port": "p16"
+                  }
+                ]
+              },
+              {
+                "switchName": "Switch 5",
+                "switchId": "S-5",
+                "switchIp": "192.168.2.3",
+                "port": "eth2",
+                "endDevices": [
+                  {
+                    "deviceName": "Device 17",
+                    "deviceType": "Smartphone",
+                    "deviceId": "D-17",
+                    "deviceIp": "192.168.2.105",
+                    "port": "p17"
+                  },
+                  {
+                    "deviceName": "Device 18",
+                    "deviceType": "Server",
+                    "deviceId": "D-18",
+                    "deviceIp": "192.168.2.106",
+                    "port": "p18"
+                  },
+                  {
+                    "deviceName": "Device 19",
+                    "deviceType": "Printer",
+                    "deviceId": "D-19",
+                    "deviceIp": "192.168.2.107",
+                    "port": "p19"
+                  },
+                  {
+                    "deviceName": "Device 20",
+                    "deviceType": "Computer",
+                    "deviceId": "D-20",
+                    "deviceIp": "192.168.2.108",
+                    "port": "p20"
+                  }
+                ]
+              },
+              {
+                "switchName": "Switch 6",
+                "switchId": "S-6",
+                "switchIp": "192.168.2.4",
+                "port": "eth3",
+                "endDevices": [
+                  {
+                    "deviceName": "Device 21",
+                    "deviceType": "Camera",
+                    "deviceId": "D-21",
+                    "deviceIp": "192.168.2.109",
+                    "port": "p21"
+                  },
+                  {
+                    "deviceName": "Device 22",
+                    "deviceType": "Laptop",
+                    "deviceId": "D-22",
+                    "deviceIp": "192.168.2.110",
+                    "port": "p22"
+                  },
+                  {
+                    "deviceName": "Device 23",
+                    "deviceType": "Smartphone",
+                    "deviceId": "D-23",
+                    "deviceIp": "192.168.2.111",
+                    "port": "p23"
+                  },
+                  {
+                    "deviceName": "Device 24",
+                    "deviceType": "Server",
+                    "deviceId": "D-24",
+                    "deviceIp": "192.168.2.112",
+                    "port": "p24"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  
+
+
+ 
