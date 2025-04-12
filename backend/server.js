@@ -11,6 +11,7 @@ const { pingNetwork } = require("./utils/tcp");
 const app = express();
 const server = http.createServer(app);
 const ioInstance = socketIo(server, {
+
   cors: {
     origin: ["http://localhost:3000", "http://localhost:3001"],
     methods: ["GET", "POST", "DELETE", "PUT", "PATCH"],
@@ -26,46 +27,47 @@ app.use(cors());
 app.use("/api/network", networkRouter(ioInstance));
 
 // Connect to MongoDB
-mongoose.connect("mongodb://localhost:27017/Network_Updated", {
+mongoose.connect("mongodb+srv://harsh:harsh@cluster0.2zcvb.mongodb.net/Network_Updated", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => console.log("MongoDB connected"))
   .catch(err => console.error("MongoDB connection error:", err));
 
-  async function getNetworkData() {
-    try {
-      console.log("🔍 Attempting to fetch network data...");
-  
-      // Fetch network and populate all nested relations
-      const networkData = await Network.findOne().populate({
-        path: "buildings",
+async function getNetworkData() {
+  try {
+    console.log("🔍 Attempting to fetch network data...");
+
+    const networkData = await Network.findOne().populate({
+      path: "buildings",
+      populate: {
+        path: "routers",
         populate: {
-          path: "routers",
+          path: "switches",
           populate: {
-            path: "switches",
-            populate: {
-              path: "endDevices",
-            },
+            path: "endDevices",
           },
         },
-      });
-  
-      console.log("✅ Fetched network data:", JSON.stringify(networkData, null, 2));
-  
-      if (!networkData) {
-        console.error("❌ No network data found in MongoDB");
-        return;
-      }
-  
-      // Start monitoring with fetched network data
-      startMonitoring(networkData);
-    } catch (error) {
-      console.error("❌ Error fetching network data:", error.message);
+      },
+    });
+
+    console.log("✅ Fetched network data:", JSON.stringify(networkData, null, 2));
+
+    if (!networkData) {
+      console.error("❌ No network data found in MongoDB");
+      return;
     }
+
+    // Start monitoring with fetched network data
+    startMonitoring(networkData);
+  } catch (error) {
+    console.error("❌ Error fetching network data:", error.message);
   }
-  
-  
-  
+}
+
+// Increase the interval for periodic fetching
+setInterval(async () => {
+  await getNetworkData();
+}, 20000); // Change to 20000ms (20 seconds)
 
 // Define API endpoint
 app.get("/api/ping-network", async (req, res) => {

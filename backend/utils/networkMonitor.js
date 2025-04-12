@@ -21,7 +21,7 @@ function startMonitoring() {
     } catch (error) {
       console.error("❌ Error in network monitoring:", error.message);
     }
-  }, 3000);
+  }, 5000);
 }
 
 module.exports = { startMonitoring };

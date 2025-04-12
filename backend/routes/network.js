@@ -1,20 +1,25 @@
 const express = require("express");
 const { Network, Building, Router, Switch, EndDevice } = require("../models/Network");
+const mongoose = require("mongoose");
 
 module.exports = (ioInstance) => {
   const router = express.Router();
 
   // Add a Node
   router.post("/nodes", async (req, res) => {
+    const { type, parentId, details } = req.body;
+
+    // Validate required fields
+    if (!type || !parentId || !details) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Validate parentId as a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(parentId)) {
+      return res.status(400).json({ error: "Invalid parentId" });
+    }
+
     try {
-      const { type, parentId, details } = req.body;
-      if (!type || !details) {
-        return res.status(400).json({ error: "Type and details are required" });
-      }
-
-      const network = await Network.findOne();
-      if (!network) return res.status(404).json({ error: "Network not found" });
-
       switch (type) {
         case "router": {
           const building = await Building.findById(parentId);
@@ -22,52 +27,93 @@ module.exports = (ioInstance) => {
             return res.status(404).json({ error: `Building not found with id: ${parentId}` });
           }
 
+          const router = new Router({
+            routerName: details.routerName,
+            routerId: details.routerId,
+            routerIp: details.routerIp,
+            port: parseInt(details.port),
+            buildingId: parentId
+          });
+          await router.save();
+
           if (!building.routers) {
             building.routers = [];
           }
 
-          const router = new Router({ ...details, buildingId: parentId });
-          await router.save();
           building.routers.push(router._id);
           await building.save();
-
-          console.log(`✅ Router ${router.routerId} added to building ${building.name}`);
-          
-          ioInstance.emit("node-added", { type, parentId, details });
-          return res.status(201).json({ 
-            message: "Router added successfully",
-            router: router
-          });
+          break;
         }
+
         case "switch": {
           const router = await Router.findById(parentId);
-          if (!router) return res.status(404).json({ error: "Parent router not found" });
-          
-          const switchNode = new Switch({ ...details, routerId: parentId });
+          if (!router) {
+            return res.status(404).json({ error: `Router not found with id: ${parentId}` });
+          }
+
+          const switchNode = new Switch({
+            switchName: details.switchName,
+            switchId: details.switchId,
+            switchIp: details.switchIp,
+            port: parseInt(details.port),
+            routerId: parentId
+          });
           await switchNode.save();
+
+          if (!router.switches) {
+            router.switches = [];
+          }
+
           router.switches.push(switchNode._id);
           await router.save();
           break;
         }
+
         case "device": {
-          const switchNode = await Switch.findById(parentId);
-          if (!switchNode) return res.status(404).json({ error: "Parent switch not found" });
-          
-          const device = new EndDevice({ ...details, switchId: parentId });
-          await device.save();
-          switchNode.endDevices.push(device._id);
-          await switchNode.save();
-          break;
+          // Check if the parent switch exists
+          const parentSwitch = await Switch.findById(parentId);
+          if (!parentSwitch) {
+            return res.status(404).json({ error: "Parent switch not found" });
+          }
+
+          // Create the new device
+          const newDevice = new EndDevice({ ...details, switchId: parentId });
+          await newDevice.save();
+
+          // Add the device to the parent switch's endDevices array
+          parentSwitch.endDevices.push(newDevice._id);
+          await parentSwitch.save();
+
+          return res.status(201).json(newDevice);
         }
+
         default:
           return res.status(400).json({ error: "Invalid node type" });
       }
+
+      const updatedNetwork = await Network.findOne()
+        .populate({
+          path: 'buildings',
+          populate: {
+            path: 'routers',
+            populate: {
+              path: 'switches',
+              populate: {
+                path: 'endDevices'
+              }
+            }
+          }
+        });
+
+      if (!updatedNetwork) {
+        return res.status(404).json({ error: "Network not found" });
+      }
+
+      res.json(updatedNetwork);
+
     } catch (error) {
-      console.error("Error adding node:", error);
-      return res.status(500).json({ 
-        error: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
+      console.error("Error adding device:", error);
+      res.status(500).json({ error: "Internal Server Error" });
     }
   });
 
@@ -75,80 +121,101 @@ module.exports = (ioInstance) => {
   router.delete("/nodes/:nodeId", async (req, res) => {
     try {
       const { nodeId } = req.params;
-      let nodeDeleted = false;
+      let deleted = false;
 
-      // Find and delete the node from the appropriate collection
       const router = await Router.findById(nodeId);
       if (router) {
-        // Remove router reference from building
-        await Building.findByIdAndUpdate(router.buildingId, {
-          $pull: { routers: nodeId }
-        });
+        await Building.updateMany(
+          { routers: nodeId },
+          { $pull: { routers: nodeId } }
+        );
         await router.remove();
-        nodeDeleted = true;
+        deleted = true;
       }
 
       const switchNode = await Switch.findById(nodeId);
       if (switchNode) {
-        // Remove switch reference from router
-        await Router.findByIdAndUpdate(switchNode.routerId, {
-          $pull: { switches: nodeId }
-        });
+        await Router.updateMany(
+          { switches: nodeId },
+          { $pull: { switches: nodeId } }
+        );
         await switchNode.remove();
-        nodeDeleted = true;
+        deleted = true;
       }
 
       const device = await EndDevice.findById(nodeId);
       if (device) {
-        // Remove device reference from switch
-        await Switch.findByIdAndUpdate(device.switchId, {
-          $pull: { endDevices: nodeId }
-        });
+        await Switch.updateMany(
+          { endDevices: nodeId },
+          { $pull: { endDevices: nodeId } }
+        );
         await device.remove();
-        nodeDeleted = true;
+        deleted = true;
       }
 
-      if (!nodeDeleted) return res.status(404).json({ error: "Node not found" });
+      if (!deleted) {
+        return res.status(404).json({ error: "Node not found" });
+      }
 
-      ioInstance.emit("node-deleted", { nodeId });
-      res.json({ message: "Node deleted successfully" });
+      const updatedNetwork = await Network.findOne().populate({
+        path: 'buildings',
+        populate: {
+          path: 'routers',
+          populate: {
+            path: 'switches',
+            populate: {
+              path: 'endDevices'
+            }
+          }
+        }
+      });
+
+      res.json(updatedNetwork);
     } catch (error) {
-      console.error("Error deleting node:", error.message);
       res.status(500).json({ error: error.message });
     }
   });
 
+  // Helper function to get updated network data
+  async function getUpdatedNetwork() {
+    return await Network.findOne().populate({
+      path: 'buildings',
+      populate: {
+        path: 'routers',
+        populate: {
+          path: 'switches',
+          populate: {
+            path: 'endDevices'
+          }
+        }
+      }
+    });
+  }
+
   // Get Network Data
   router.get("/", async (req, res) => {
     try {
-      console.log("🌐 Fetching complete network hierarchy...");
-      
       const network = await Network.findOne()
         .populate({
-          path: "buildings",
+          path: 'buildings',
           populate: {
-            path: "routers",
-            model: "Router",
+            path: 'routers',
             populate: {
-              path: "switches",
-              model: "Switch",
+              path: 'switches',
               populate: {
-                path: "endDevices",
-                model: "EndDevice"
+                path: 'endDevices'
               }
             }
           }
-        }).exec();
+        });
 
       if (!network) {
-        console.log("❌ Network not found");
         return res.status(404).json({ error: "Network not found" });
       }
 
-      console.log("✅ Network hierarchy fetched successfully");
       res.json(network);
+      
     } catch (error) {
-      console.error("❌ Error fetching network:", error.message);
       res.status(500).json({ error: error.message });
     }
   });
@@ -156,7 +223,6 @@ module.exports = (ioInstance) => {
   router.get("/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      console.log(`🌐 Fetching network data for ID: ${id}`);
   
       const network = await Network.findById(id)
         .populate({
@@ -177,14 +243,11 @@ module.exports = (ioInstance) => {
         .exec();
   
       if (!network) {
-        console.log("❌ Network not found");
         return res.status(404).json({ error: "Network not found" });
       }
   
-      console.log("✅ Network data fetched successfully");
       res.json(network);
     } catch (error) {
-      console.error("❌ Error fetching network:", error.message);
       res.status(500).json({ error: error.message });
     }
   });
@@ -229,7 +292,6 @@ module.exports = (ioInstance) => {
 
       res.json(parentNodes);
     } catch (error) {
-      console.error("Error fetching parent nodes:", error);
       res.status(500).json({ error: error.message });
     }
   });

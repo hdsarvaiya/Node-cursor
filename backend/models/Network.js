@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const endDeviceSchema = new mongoose.Schema({
   deviceId: { type: String, required: true, unique: true },
   deviceName: { type: String, required: true },
-  deviceType: { type: String, required: true },
+  // deviceType: { type: String, required: true },
   deviceIp: { type: String, required: true },
   status: { type: String, enum: ["active", "inactive"], default: "active" },
   port: { type: Number, required: true },
@@ -19,7 +19,13 @@ const switchSchema = new mongoose.Schema({
   status: { type: String, enum: ["active", "inactive"], default: "active" },
   port: { type: Number, required: true },
   routerId: { type: mongoose.Schema.Types.ObjectId, ref: "Router", required: true },
-  endDevices: [{ type: mongoose.Schema.Types.ObjectId, ref: "EndDevice" }]
+  endDevices: {
+    type: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'EndDevice'
+    }],
+    default: []
+  }
 }, { timestamps: true });
 
 // Router Schema
@@ -30,13 +36,25 @@ const routerSchema = new mongoose.Schema({
   status: { type: String, enum: ["active", "inactive"], default: "active" },
   port: { type: Number, required: true },
   buildingId: { type: mongoose.Schema.Types.ObjectId, ref: "Building", required: true },
-  switches: [{ type: mongoose.Schema.Types.ObjectId, ref: "Switch" }]
+  switches: {
+    type: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Switch'
+    }],
+    default: []
+  }
 }, { timestamps: true });
 
 // Building Schema
 const buildingSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true },
-  routers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Router" }]
+  routers: {
+    type: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Router'
+    }],
+    default: []
+  }
 }, { timestamps: true });
 
 // Ensure routers array is initialized

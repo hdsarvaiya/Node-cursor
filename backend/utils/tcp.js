@@ -53,7 +53,7 @@ async function fetchAndPingNetwork() {
 
     console.log("🛠 Found routers:", routers.map(r => r.routerName));
 
-    // 5️⃣ Ping Routers
+    // 5️⃣ Ping Routers 
     for (const router of routers) {
       try {
         const routerPing = await ping.promise.probe(router.routerIp);
