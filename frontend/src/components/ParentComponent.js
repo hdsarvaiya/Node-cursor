@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import PropTypes from 'prop-types';
-import './NodeTable.css';
+import NodeTable from './NodeTable';
 
-const NodeTable = () => {
+const NetworkManager = () => {
   const [nodes, setNodes] = useState([]);
 
   // Fetch network data from the backend
@@ -30,7 +29,7 @@ const NodeTable = () => {
                 name: router.routerName,
                 status: router.status || 'N/A',
                 type: 'Router',
-                ip: router.routerIp || 'N/A',
+                routerIp: router.routerIp,
               });
 
               if (router.switches) {
@@ -40,7 +39,7 @@ const NodeTable = () => {
                     name: switchNode.switchName,
                     status: switchNode.status || 'N/A',
                     type: 'Switch',
-                    ip: switchNode.switchIp || 'N/A',
+                    switchIp: switchNode.switchIp,
                   });
 
                   if (switchNode.endDevices) {
@@ -50,7 +49,7 @@ const NodeTable = () => {
                         name: device.deviceName,
                         status: device.status || 'N/A',
                         type: 'Device',
-                        ip: device.deviceIp || 'N/A',
+                        deviceIp: device.deviceIp,
                       });
                     });
                   }
@@ -71,43 +70,12 @@ const NodeTable = () => {
     fetchNetworkData();
   }, []);
 
-  if (!nodes || nodes.length === 0) {
-    return (
-      <div className="node-table-container">
-        <h3>No network nodes available</h3>
-      </div>
-    );
-  }
-
   return (
-    <div className="node-table-container">
-      <h3>Network Nodes</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Status</th>
-            <th>IP Address</th>
-          </tr>
-        </thead>
-        <tbody>
-          {nodes.map((node) => (
-            <tr key={node._id}>
-              <td>{node.name}</td>
-              <td>{node.type}</td>
-              <td>{node.status}</td>
-              <td>{node.ip || 'N/A'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div>
+      <h1>Network Manager</h1>
+      <NodeTable nodes={nodes} onUpdateNetwork={fetchNetworkData} />
     </div>
   );
 };
 
-NodeTable.propTypes = {
-  nodes: PropTypes.array,
-};
-
-export default NodeTable;
+export default NetworkManager;

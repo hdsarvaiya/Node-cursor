@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
+import PropTypes from 'prop-types';
 
 const NodeManagementPortal = ({ onUpdateGraph }) => {
   const [actionType, setActionType] = useState("add");
   const [nodeType, setNodeType] = useState("router");
-  const [parentNodes, setParentNodes] = useState([]);
-  const [selectedParentNodeId, setSelectedParentNodeId] = useState("");
+  const [selectedBuilding, setSelectedBuilding] = useState("");
+  const [selectedRouter, setSelectedRouter] = useState("");
+  const [selectedSwitch, setSelectedSwitch] = useState("");
+  const [buildings, setBuildings] = useState([]);
+  const [routers, setRouters] = useState([]);
+  const [switches, setSwitches] = useState([]);
   const [nodeDetails, setNodeDetails] = useState({
     routerName: "",
     routerId: "",
     routerIp: "",
+    port: "",
     switchName: "",
     switchId: "",
     switchIp: "",
@@ -25,7 +31,7 @@ const NodeManagementPortal = ({ onUpdateGraph }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const newSocket = io(); // Replace with your server address
+    const newSocket = io("http://localhost:5000"); // Specify the correct server URL
     setSocket(newSocket);
 
     newSocket.on("graphUpdated", (updatedGraph) => {
@@ -37,71 +43,93 @@ const NodeManagementPortal = ({ onUpdateGraph }) => {
     };
   }, [onUpdateGraph]);
 
-  const fetchParentNodes = async (nodeType) => {
-    try {
-      // First, get the network structure
-      const response = await axios.get('http://localhost:5000/api/network');
-      const network = response.data;
-
-      let nodes = [];
-      switch (nodeType) {
-        case 'router':
-          // For routers, return all buildings
-          nodes = network.buildings.map(building => ({
-            id: building._id,
-            name: building.name
-          }));
-          break;
-        case 'switch':
-          // For switches, get all routers from all buildings
-          nodes = network.buildings.flatMap(building => 
-            (building.routers || []).map(router => ({
-              id: router._id,
-              name: router.routerName
-            }))
-          );
-          break;
-        case 'device':
-          // For devices, get all switches from all routers
-          nodes = network.buildings.flatMap(building =>
-            (building.routers || []).flatMap(router =>
-              (router.switches || []).map(switch_ => ({
-                id: switch_._id,
-                name: switch_.switchName
-              }))
-            )
-          );
-          break;
-      }
-      setParentNodes(nodes);
-      setSelectedParentNodeId(nodes[0]?.id || "");
-      return nodes;
-    } catch (error) {
-      console.error("Error fetching parent nodes:", error);
-      setError(error.message);
-      return [];
-    }
-  };
-
+  // Fetch initial network data
   useEffect(() => {
-    fetchParentNodes(nodeType);
-  }, [nodeType]);
+    const fetchNetworkData = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/network');
+        const network = response.data;
+        setBuildings(network.buildings || []);
+      } catch (error) {
+        console.error("Error fetching network data:", error);
+        alert("Error fetching network data");
+      }
+    };
+    fetchNetworkData();
+  }, []);
+
+  // Update available routers when building is selected
+  useEffect(() => {
+    if (selectedBuilding) {
+      const building = buildings.find(b => b._id === selectedBuilding);
+      setRouters(building?.routers || []);
+      setSelectedRouter("");
+      setSelectedSwitch("");
+    } else {
+      setRouters([]);
+    }
+  }, [selectedBuilding, buildings]);
+
+  // Update available switches when router is selected
+  useEffect(() => {
+    if (selectedRouter) {
+      const router = routers.find(r => r._id === selectedRouter);
+      setSwitches(router?.switches || []);
+      setSelectedSwitch("");
+    } else {
+      setSwitches([]);
+    }
+  }, [selectedRouter, routers]);
 
   const handleAddNode = async () => {
     try {
       setLoading(true);
+      let parentId;
+      
+      switch (nodeType) {
+        case "router":
+          parentId = selectedBuilding;
+          break;
+        case "switch":
+          parentId = selectedRouter;
+          break;
+        case "device":
+          parentId = selectedSwitch;
+          break;
+        default:
+          throw new Error("Invalid node type");
+      }
+
+      if (!parentId) {
+        throw new Error("Please select a parent node");
+      }
+
       const payload = {
         type: nodeType,
-        parentNode: selectedParentNodeId,
-        details: nodeDetails,
+        parentId,
+        details: nodeDetails
       };
-      console.log("Add node payload:", payload);
-      const response = await axios.post("/nodes", payload);
+
+      const response = await axios.post("http://localhost:5000/api/network/nodes", payload);
       onUpdateGraph(response.data);
-      socket.emit("nodeAdded", response.data);
       alert("Node added successfully!");
+      
+      // Reset form
+      setNodeDetails({
+        routerName: "",
+        routerId: "",
+        routerIp: "",
+        port: "",
+        switchName: "",
+        switchId: "",
+        switchIp: "",
+        deviceName: "",
+        deviceId: "",
+        deviceIp: "",
+        status: "active"
+      });
     } catch (error) {
-      alert(`Error adding node: ${error.message}`);
+      alert(error.response?.data?.error || error.message);
     } finally {
       setLoading(false);
     }
@@ -110,12 +138,12 @@ const NodeManagementPortal = ({ onUpdateGraph }) => {
   const handleDeleteNode = async () => {
     try {
       setLoading(true);
-      const response = await axios.delete(`/nodes/${nodeIdToDelete}`);
+      const response = await axios.delete(`http://localhost:5000/api/network/nodes/${nodeIdToDelete}`);
       onUpdateGraph(response.data);
-      socket.emit("nodeDeleted", response.data);
+      setNodeIdToDelete('');
       alert("Node deleted successfully!");
     } catch (error) {
-      alert(`Error deleting node: ${error.message}`);
+      alert(error.response?.data?.error || error.message);
     } finally {
       setLoading(false);
     }
@@ -137,192 +165,252 @@ const NodeManagementPortal = ({ onUpdateGraph }) => {
   return (
     <div style={styles.container}>
       <h2 style={styles.header}>Node Management Portal</h2>
-      <form onSubmit={handleSubmit} style={styles.form}>
+      <form onSubmit={(e) => { e.preventDefault(); handleAddNode(); }} style={styles.form}>
         <div style={styles.formGroup}>
-          <label style={styles.label}>Action</label>
+          <label style={styles.label}>Node Type</label>
           <select
             style={styles.select}
-            value={actionType}
-            onChange={(e) => setActionType(e.target.value)}
+            value={nodeType}
+            onChange={(e) => setNodeType(e.target.value)}
           >
-            <option value="add">Add Node</option>
-            <option value="delete">Delete Node</option>
+            <option value="router">Router</option>
+            <option value="switch">Switch</option>
+            <option value="device">Device</option>
           </select>
         </div>
 
-        {actionType === "add" && (
+        {/* Building Selection */}
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Building</label>
+          <select
+            style={styles.select}
+            value={selectedBuilding}
+            onChange={(e) => setSelectedBuilding(e.target.value)}
+            required
+          >
+            <option value="">Select Building</option>
+            {buildings.map(building => (
+              <option key={building._id} value={building._id}>
+                {building.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Router Selection - Show only for switch and device */}
+        {(nodeType === "switch" || nodeType === "device") && (
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Router</label>
+            <select
+              style={styles.select}
+              value={selectedRouter}
+              onChange={(e) => setSelectedRouter(e.target.value)}
+              required
+            >
+              <option value="">Select Router</option>
+              {routers.map(router => (
+                <option key={router._id} value={router._id}>
+                  {router.routerName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Switch Selection - Show only for device */}
+        {nodeType === "device" && (
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Switch</label>
+            <select
+              style={styles.select}
+              value={selectedSwitch}
+              onChange={(e) => setSelectedSwitch(e.target.value)}
+              required
+            >
+              <option value="">Select Switch</option>
+              {switches.map(switch_ => (
+                <option key={switch_._id} value={switch_._id}>
+                  {switch_.switchName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Router Details Form */}
+        {nodeType === "router" && (
           <>
             <div style={styles.formGroup}>
-              <label style={styles.label}>Node Type</label>
-              <select
-                style={styles.select}
-                value={nodeType}
-                onChange={(e) => setNodeType(e.target.value)}
-              >
-                <option value="router">Router</option>
-                <option value="switch">Switch</option>
-                <option value="device">Device</option>
-              </select>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Parent Node</label>
-              <select
-                style={styles.select}
-                value={selectedParentNodeId}
-                onChange={(e) => setSelectedParentNodeId(e.target.value)}
-              >
-                {parentNodes.length > 0 ? (
-                  parentNodes.map((node) => (
-                    <option key={node._id} value={node._id}>
-                      {node.routerName || node.buildingName || node.switchName}
-                    </option>
-                  ))
-                ) : (
-                  <option disabled>No parent nodes available</option>
-                )}
-              </select>
-            </div>
-
-            {nodeType === "router" && (
-              <>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Router Name</label>
-                  <input
-                    style={styles.input}
-                    type="text"
-                    name="routerName"
-                    value={nodeDetails.routerName}
-                    onChange={handleDetailChange}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Router ID</label>
-                  <input
-                    style={styles.input}
-                    type="text"
-                    name="routerId"
-                    value={nodeDetails.routerId}
-                    onChange={handleDetailChange}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Router IP</label>
-                  <input
-                    style={styles.input}
-                    type="text"
-                    name="routerIp"
-                    value={nodeDetails.routerIp}
-                    onChange={handleDetailChange}
-                  />
-                </div>
-              </>
-            )}
-
-            {nodeType === "switch" && (
-              <>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Switch Name</label>
-                  <input
-                    style={styles.input}
-                    type="text"
-                    name="switchName"
-                    value={nodeDetails.switchName}
-                    onChange={handleDetailChange}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Switch ID</label>
-                  <input
-                    style={styles.input}
-                    type="text"
-                    name="switchId"
-                    value={nodeDetails.switchId}
-                    onChange={handleDetailChange}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Switch IP</label>
-                  <input
-                    style={styles.input}
-                    type="text"
-                    name="switchIp"
-                    value={nodeDetails.switchIp}
-                    onChange={handleDetailChange}
-                  />
-                </div>
-              </>
-            )}
-
-            {nodeType === "device" && (
-              <>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Device Name</label>
-                  <input
-                    style={styles.input}
-                    type="text"
-                    name="deviceName"
-                    value={nodeDetails.deviceName}
-                    onChange={handleDetailChange}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Device ID</label>
-                  <input
-                    style={styles.input}
-                    type="text"
-                    name="deviceId"
-                    value={nodeDetails.deviceId}
-                    onChange={handleDetailChange}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Device IP</label>
-                  <input
-                    style={styles.input}
-                    type="text"
-                    name="deviceIp"
-                    value={nodeDetails.deviceIp}
-                    onChange={handleDetailChange}
-                  />
-                </div>
-              </>
-            )}
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Status</label>
-              <select
-                style={styles.select}
-                name="status"
-                value={nodeDetails.status}
+              <label style={styles.label}>Router Name</label>
+              <input
+                style={styles.input}
+                type="text"
+                name="routerName"
+                value={nodeDetails.routerName}
                 onChange={handleDetailChange}
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+                required
+                placeholder="Enter router name"
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Router ID</label>
+              <input
+                style={styles.input}
+                type="text"
+                name="routerId"
+                value={nodeDetails.routerId}
+                onChange={handleDetailChange}
+                required
+                placeholder="Enter router ID"
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Router IP</label>
+              <input
+                style={styles.input}
+                type="text"
+                name="routerIp"
+                value={nodeDetails.routerIp}
+                onChange={handleDetailChange}
+                required
+                placeholder="Enter router IP (e.g., 192.168.1.1)"
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Port</label>
+              <input
+                style={styles.input}
+                type="number"
+                name="port"
+                value={nodeDetails.port}
+                onChange={handleDetailChange}
+                required
+                placeholder="Enter port number (e.g., 8080)"
+                min="1"
+                max="65535"
+              />
             </div>
           </>
         )}
 
-        {actionType === "delete" && (
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Node ID to Delete</label>
-            <input
-              style={styles.input}
-              type="text"
-              value={nodeIdToDelete}
-              onChange={(e) => setNodeIdToDelete(e.target.value)}
-              placeholder="Enter Node ID"
-            />
-          </div>
+        {/* Switch Details Form */}
+        {nodeType === "switch" && (
+          <>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Switch Name</label>
+              <input
+                style={styles.input}
+                type="text"
+                name="switchName"
+                value={nodeDetails.switchName}
+                onChange={handleDetailChange}
+                required
+                placeholder="Enter switch name"
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Switch ID</label>
+              <input
+                style={styles.input}
+                type="text"
+                name="switchId"
+                value={nodeDetails.switchId}
+                onChange={handleDetailChange}
+                required
+                placeholder="Enter switch ID"
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Switch IP</label>
+              <input
+                style={styles.input}
+                type="text"
+                name="switchIp"
+                value={nodeDetails.switchIp}
+                onChange={handleDetailChange}
+                required
+                placeholder="Enter switch IP (e.g., 192.168.1.2)"
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Port</label>
+              <input
+                style={styles.input}
+                type="number"
+                name="port"
+                value={nodeDetails.port}
+                onChange={handleDetailChange}
+                required
+                placeholder="Enter port number (e.g., 8081)"
+                min="1"
+                max="65535"
+              />
+            </div>
+          </>
         )}
 
-        <button type="submit" style={styles.button} disabled={loading}>
-          {loading
-            ? "Processing..."
-            : actionType === "add"
-            ? "Add Node"
-            : "Delete Node"}
+        {/* Device Details Form */}
+        {nodeType === "device" && (
+          <>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Device Name</label>
+              <input
+                style={styles.input}
+                type="text"
+                name="deviceName"
+                value={nodeDetails.deviceName}
+                onChange={handleDetailChange}
+                required
+                placeholder="Enter device name"
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Device ID</label>
+              <input
+                style={styles.input}
+                type="text"
+                name="deviceId"
+                value={nodeDetails.deviceId}
+                onChange={handleDetailChange}
+                required
+                placeholder="Enter device ID"
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Device IP</label>
+              <input
+                style={styles.input}
+                type="text"
+                name="deviceIp"
+                value={nodeDetails.deviceIp}
+                onChange={handleDetailChange}
+                required
+                placeholder="Enter device IP (e.g., 192.168.1.10)"
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Port</label>
+              <input
+                style={styles.input}
+                type="number"
+                name="port"
+                value={nodeDetails.port}
+                onChange={handleDetailChange}
+                required
+                placeholder="Enter port number (e.g., 8082)"
+                min="1"
+                max="65535"
+              />
+            </div>
+          </>
+        )}
+
+        <button 
+          type="submit" 
+          style={styles.button}
+          disabled={loading}
+        >
+          {loading ? "Adding..." : "Add Node"}
         </button>
       </form>
     </div>
@@ -378,6 +466,10 @@ const styles = {
     borderRadius: "4px",
     cursor: "pointer",
   },
+};
+
+NodeManagementPortal.propTypes = {
+  onUpdateGraph: PropTypes.func.isRequired,
 };
 
 export default NodeManagementPortal;

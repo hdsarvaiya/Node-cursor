@@ -1,30 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Network } from "vis-network/standalone";
+import { Network } from "vis-network";
 import io from "socket.io-client";
+import PropTypes from 'prop-types';
 
 const socket = io("http://localhost:5000");
 
-const Graph = ({ networkId }) => {
+const Graph = ({ network }) => {
   const containerRef = useRef(null);
-  const [network, setNetwork] = useState(null);
   const [nodeStatuses, setNodeStatuses] = useState({});
   const networkInstanceRef = useRef(null);
   const zoomAndPositionRef = useRef({ zoom: 1, x: 0, y: 0 });
 
   useEffect(() => {
-    // Fetch network data from the server
-    const fetchNetworkData = async () => {
-      try {
-        const response = await fetch(`http://localhost:5000/api/networks`);
-        const data = await response.json();
-        setNetwork(data);
-      } catch (error) {
-        console.error('Error fetching network data:', error);
-      }
-    };
-
-    fetchNetworkData();
-
     socket.on("nodeStatus", ({ ip, status }) => {
       setNodeStatuses((prevStatuses) => ({ ...prevStatuses, [ip]: status }));
     });
@@ -32,7 +19,7 @@ const Graph = ({ networkId }) => {
     return () => {
       socket.off("nodeStatus");
     };
-  }, [networkId]);
+  }, []);
 
   useEffect(() => {
     if (!network || containerRef.current === null) return;
@@ -43,123 +30,186 @@ const Graph = ({ networkId }) => {
 
     const generateUniqueId = (prefix) => `${prefix}-${uniqueIdCounter++}`;
 
-    const traverseNetwork = (node, parentId = null, type = null) => {
-      if (!node || typeof node !== "object") return;
+    // Save the current zoom and position before updating the graph
+    const currentView = networkInstanceRef.current?.getViewPosition();
+    const currentZoom = networkInstanceRef.current?.getScale();
 
-      const id = generateUniqueId(type || "node");
-      const label = node.name || node.routerName || node.switchName || node.deviceName || "Unknown Node";
-      const ip = node.routerIp || node.switchIp || node.deviceIp;
-      const status = nodeStatuses[ip] || "inactive";
+    // Define positions for buildings (corners of a box)
+    const boxSize = 600; // Size of the box
+    const buildingPositions = [
+      { x: -boxSize / 2, y: -boxSize / 2, direction: "right" }, // Top-left
+      { x: boxSize / 2, y: -boxSize / 2, direction: "down" },   // Top-right
+      { x: -boxSize / 2, y: boxSize / 2, direction: "up" },     // Bottom-left
+      { x: boxSize / 2, y: boxSize / 2, direction: "left" },    // Bottom-right
+    ];
 
-      nodes.push({
-        id,
-        label: `${label}\n${ip || ""}`,
-        color: status === "active" ? "green" : "red",
-        size: type === "router" ? 50 : type === "switch" ? 40 : 30,
-        font: { size: 22, color: "#ffffff" },
-      });
-
-      if (parentId) {
-        edges.push({
-          from: parentId,
-          to: id,
-          color: { color: status === "active" ? "green" : "red" },
-        });
-      }
-
-      if (node.switches) {
-        node.switches.forEach((sw) => traverseNetwork(sw, id, "switch"));
-      }
-
-      if (node.devices) {
-        node.devices.forEach((device) => traverseNetwork(device, id, "device"));
-      }
-    };
-
+    // Create root network node at the center of the box
     const rootId = "networkRoot";
     nodes.push({
       id: rootId,
-      label: network.networkName || "L&T Network",
-      color: "blue",
+      label: network.name || "Network",
+      color: "#2B7CE9",
       size: 60,
-      font: { size: 40, color: "#ffffff" },
+      font: { size: 30, color: "#ffffff" },
+      x: 0,
+      y: 0, // Center position
     });
 
-    if (network.routers) {
-      network.routers.forEach((router) => {
-        traverseNetwork(router, rootId, "router");
+    // Process buildings
+    if (network.buildings && Array.isArray(network.buildings)) {
+      network.buildings.forEach((building, index) => {
+        const buildingId = generateUniqueId("building");
+        const position = buildingPositions[index % buildingPositions.length]; // Assign positions cyclically
+        nodes.push({
+          id: buildingId,
+          label: building.name,
+          color: "#4CAF50",
+          size: 50,
+          font: { size: 25, color: "#ffffff" },
+          x: position.x,
+          y: position.y,
+        });
+        edges.push({
+          from: rootId,
+          to: buildingId,
+        });
+
+        // Process routers
+        if (building.routers && Array.isArray(building.routers)) {
+          building.routers.forEach((router, routerIndex) => {
+            const routerId = generateUniqueId("router");
+            const routerOffset = 100 * (routerIndex + 1); // Reduced offset for routers
+            const routerPosition = calculatePosition(position, routerOffset, position.direction);
+            nodes.push({
+              id: routerId,
+              label: `${router.routerName}\n${router.routerIp || ""}`,
+              color: nodeStatuses[router.routerIp] === "active" ? "#00ff00" : "#ff4444", // Green if active, red otherwise
+              size: 45,
+              font: { size: 20, color: "#ffffff" },
+              x: routerPosition.x,
+              y: routerPosition.y,
+            });
+            edges.push({
+              from: buildingId,
+              to: routerId,
+            });
+
+            // Process switches
+            if (router.switches && Array.isArray(router.switches)) {
+              router.switches.forEach((switch_, switchIndex) => {
+                const switchId = generateUniqueId("switch");
+                const switchOffset = routerOffset + 50 * (switchIndex + 1); // Offset for switches remains the same
+                const switchPosition = calculatePosition(routerPosition, switchOffset, position.direction);
+                nodes.push({
+                  id: switchId,
+                  label: `${switch_.switchName}\n${switch_.switchIp || ""}`,
+                  color: nodeStatuses[switch_.switchIp] === "active" ? "#00ff00" : "#ff4444", // Green if active, red otherwise
+                  size: 40,
+                  font: { size: 18, color: "#ffffff" },
+                  x: switchPosition.x,
+                  y: switchPosition.y,
+                });
+                edges.push({
+                  from: routerId,
+                  to: switchId,
+                });
+
+                // Process devices
+                if (switch_.endDevices && Array.isArray(switch_.endDevices)) {
+                  switch_.endDevices.forEach((device, deviceIndex) => {
+                    const deviceId = generateUniqueId("device");
+                    const deviceOffset = switchOffset + 150 * (deviceIndex + 1); // Offset for devices remains the same
+                    const devicePosition = calculatePosition(switchPosition, deviceOffset, position.direction);
+                    nodes.push({
+                      id: deviceId,
+                      label: `${device.deviceName}\n${device.deviceIp || ""}`,
+                      color: nodeStatuses[device.deviceIp] === "active" ? "#00ff00" : "#ff4444", // Green if active, red otherwise
+                      size: 35,
+                      font: { size: 16, color: "#ffffff" },
+                      x: devicePosition.x,
+                      y: devicePosition.y,
+                    });
+                    edges.push({
+                      from: switchId,
+                      to: deviceId,
+                    });
+                  });
+                }
+              });
+            }
+          });
+        }
       });
     }
 
     const data = { nodes, edges };
 
     const options = {
-      layout: {
-        hierarchical: {
-          direction: "UD",
-          nodeSpacing: 500,
-          levelSeparation: 300,
-        },
-      },
       physics: {
-        enabled: false,
-        stabilization: false,
+        enabled: false, // Disable physics for a static layout
       },
       interaction: {
-        dragNodes: true,
+        dragNodes: false, // Disable dragging
         zoomView: true,
         hover: true,
       },
       nodes: {
         shape: "box",
-        font: { size: 12 },
         borderWidth: 2,
-        margin: 15,
+        margin: 10,
+        shadow: true,
       },
       edges: {
-        arrows: { to: { enabled: true, scaleFactor: 1.2 } },
+        arrows: { to: { enabled: true, scaleFactor: 1 } },
         smooth: {
           type: "cubicBezier",
           roundness: 0.2,
         },
+        shadow: true,
+        width: 2,
       },
     };
 
     if (!networkInstanceRef.current) {
       networkInstanceRef.current = new Network(containerRef.current, data, options);
-
-      networkInstanceRef.current.on("zoom", (event) => {
-        zoomAndPositionRef.current.zoom = event.scale;
-      });
-
-      networkInstanceRef.current.on("dragEnd", (event) => {
-        zoomAndPositionRef.current.x = event.pointer.canvas.x;
-        zoomAndPositionRef.current.y = event.pointer.canvas.y;
-      });
     } else {
-      const currentZoom = networkInstanceRef.current.getScale();
-      const currentPosition = networkInstanceRef.current.getViewPosition();
-
-      zoomAndPositionRef.current.zoom = currentZoom;
-      zoomAndPositionRef.current.x = currentPosition.x;
-      zoomAndPositionRef.current.y = currentPosition.y;
-
       networkInstanceRef.current.setData(data);
+    }
 
+    // Restore the zoom and position after updating the graph
+    if (currentView && currentZoom) {
       networkInstanceRef.current.moveTo({
-        scale: zoomAndPositionRef.current.zoom,
-        position: { x: zoomAndPositionRef.current.x, y: zoomAndPositionRef.current.y },
+        position: currentView,
+        scale: currentZoom,
       });
     }
 
     return () => {};
   }, [network, nodeStatuses]);
 
+  // Helper function to calculate positions based on diagonal direction
+  const calculatePosition = (basePosition, offset, direction) => {
+    const gap = 100; // Horizontal gap to ensure spacing between nodes
+    switch (direction) {
+      case "right":
+        return { x: basePosition.x + offset + gap, y: basePosition.y - offset - gap }; // Diagonal up-right (outward)
+      case "down":
+        return { x: basePosition.x + offset + gap, y: basePosition.y + offset + gap }; // Diagonal down-right (outward)
+      case "left":
+        return { x: basePosition.x - offset - gap, y: basePosition.y + offset + gap }; // Diagonal down-left (outward)
+      case "up":
+        return { x: basePosition.x - offset - gap, y: basePosition.y - offset - gap }; // Diagonal up-left (outward)
+      default:
+        return basePosition;
+    }
+  };
+
   return (
     <div
       ref={containerRef}
       style={{
         height: "700px",
+        width: "100%",
         border: "1px solid #ddd",
         backgroundColor: "#f4f4f4",
         borderRadius: "8px",
@@ -168,6 +218,10 @@ const Graph = ({ networkId }) => {
       }}
     />
   );
+};
+
+Graph.propTypes = {
+  network: PropTypes.object,
 };
 
 export default Graph;

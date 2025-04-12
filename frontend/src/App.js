@@ -7,6 +7,7 @@ import NodeTable from './components/NodeTable';
 import { useNavigate } from 'react-router-dom';
 
 const App = () => {
+  const [network, setNetwork] = useState(null);
   const [networkData, setNetworkData] = useState({
     buildings: [],
     name: '',
@@ -22,23 +23,14 @@ const App = () => {
     setLoading(true);
     try {
       const response = await axios.get('http://localhost:5000/api/network');
-      const data = response.data || { 
-        buildings: [], 
-        routers: [], 
-        switches: [], 
-        devices: [],
-        name: '' 
-      };
-      setNetworkData({
-        ...data,
-        buildings: data.buildings || [],
-        routers: data.routers || [],
-        switches: data.switches || [],
-        devices: data.devices || []
-      });
-    } catch (err) {
-      console.error('Error fetching network data:', err);
-      setError(err.message);
+      if (response.data) {
+        console.log("Network data received:", response.data);
+        setNetworkData(response.data);
+        setNetwork(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching network data:', error);
+      setError(error.message);
       setNetworkData({
         buildings: [],
         name: '',
@@ -69,6 +61,11 @@ const App = () => {
     fetchNetworkData();
   };
 
+  const handleUpdateGraph = (updatedNetwork) => {
+    console.log("Updating network data:", updatedNetwork);
+    setNetworkData(updatedNetwork);
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '20px' }}>
@@ -97,12 +94,12 @@ const App = () => {
     <div style={{ justifyContent: 'space-between', padding: '20px' }}>
       <div style={{ width: '100%' }}>
         {hasNodes ? (
-          <Graph network={networkData} nodeStatuses={nodeStatuses} />
+          <Graph network={network} nodeStatuses={nodeStatuses} />
         ) : (
           <p>No network nodes available</p>
         )}
       </div>
-      <NodeManagementPortal networkData={networkData} />
+      <NodeManagementPortal onUpdateGraph={handleUpdateGraph} />
       <NodeTable 
         nodes={networkData.buildings || []}
         onUpdateNetwork={handleUpdateNetwork}
